@@ -9,6 +9,8 @@ class AnalysisBase(BaseModel):
     analysis_content: str
     web_research: str
     web_sources: Any  # JSON parsed from DB
+    justice_score: Optional[Any] = None  # JSON parsed from DB
+    timeline: Optional[Any] = None  # JSON parsed from DB
 
 class AnalysisCreate(AnalysisBase):
     pass

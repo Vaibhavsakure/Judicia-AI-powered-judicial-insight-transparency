@@ -314,7 +314,9 @@ async def analyze_pdf(file: UploadFile = File(...), db: Session = Depends(get_db
             laws=result.get("laws", ""),
             analysis_content=result.get("analysis", ""),
             web_research=result.get("web_research", ""),
-            web_sources=json.dumps(result.get("web_sources", []))
+            web_sources=json.dumps(result.get("web_sources", [])),
+            justice_score=json.dumps(result.get("justice_score")) if result.get("justice_score") else None,
+            timeline=json.dumps(result.get("timeline")) if result.get("timeline") else None
         )
         db.add(analysis)
         db.commit()
@@ -400,6 +402,20 @@ def get_history_detail(judgment_id: int, db: Session = Depends(get_db)):
         except (json.JSONDecodeError, TypeError):
             web_sources = []
 
+    justice_score = None
+    if latest_analysis and latest_analysis.justice_score:
+        try:
+            justice_score = json.loads(latest_analysis.justice_score)
+        except (json.JSONDecodeError, TypeError):
+            justice_score = None
+
+    timeline = None
+    if latest_analysis and latest_analysis.timeline:
+        try:
+            timeline = json.loads(latest_analysis.timeline)
+        except (json.JSONDecodeError, TypeError):
+            timeline = None
+
     return {
         "id": judgment.id,
         "filename": judgment.filename,
@@ -408,6 +424,8 @@ def get_history_detail(judgment_id: int, db: Session = Depends(get_db)):
         "laws": latest_analysis.laws if latest_analysis else None,
         "analysis": latest_analysis.analysis_content if latest_analysis else None,
         "web_sources": web_sources,
+        "justice_score": justice_score,
+        "timeline": timeline,
     }
 
 @app.get("/health")

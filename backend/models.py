@@ -24,6 +24,8 @@ class Analysis(Base):
     analysis_content = Column(Text)  # Combined precedent + logic
     web_research = Column(Text)
     web_sources = Column(Text)  # JSON string
+    justice_score = Column(Text)  # JSON string - fairness scoring data
+    timeline = Column(Text)  # JSON string - case timeline events
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     judgment = relationship("Judgment", back_populates="analyses")
