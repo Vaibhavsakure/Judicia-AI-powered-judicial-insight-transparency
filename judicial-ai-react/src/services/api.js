@@ -3,11 +3,11 @@ import axios from "axios";
 /**
  * Base backend URL
  * - Local dev: http://127.0.0.1:8000
- * - Production: https://c557-49-248-160-250.ngrok-free.app
+ * - Production: set VITE_API_URL env variable
  */
 const API_BASE =
     import.meta.env.VITE_API_URL ||
-    "https://c557-49-248-160-250.ngrok-free.app";
+    "http://127.0.0.1:8000";
 
 // -------------------- ANALYZE PDF --------------------
 export const analyzeDocument = async (file, onProgress) => {
@@ -35,7 +35,7 @@ export const analyzeDocument = async (file, onProgress) => {
         if (error.code === "ECONNABORTED") {
             return {
                 success: false,
-                error: "Analysis timed out (3 min limit)",
+                error: "Analysis timed out (3 min limit). The AI agents may need more time for this document.",
                 type: "timeout",
             };
         }
@@ -43,7 +43,7 @@ export const analyzeDocument = async (file, onProgress) => {
         if (error.code === "ERR_NETWORK") {
             return {
                 success: false,
-                error: "Could not connect to backend",
+                error: "Could not connect to backend. Make sure the server is running on port 8000.",
                 type: "connection",
             };
         }
@@ -53,7 +53,7 @@ export const analyzeDocument = async (file, onProgress) => {
             error:
                 error.response?.data?.detail ||
                 error.message ||
-                "Unexpected error",
+                "Unexpected error occurred",
             type: "error",
         };
     }
@@ -65,7 +65,11 @@ export const fetchHistory = async () => {
         const response = await axios.get(`${API_BASE}/history`);
         return { success: true, data: response.data };
     } catch (error) {
-        return { success: false, error: error.message };
+        return {
+            success: false,
+            error: error.response?.data?.detail || error.message,
+            data: [],
+        };
     }
 };
 
@@ -74,7 +78,28 @@ export const fetchAnalysisById = async (id) => {
         const response = await axios.get(`${API_BASE}/history/${id}`);
         return { success: true, data: response.data };
     } catch (error) {
-        return { success: false, error: error.message };
+        return {
+            success: false,
+            error: error.response?.data?.detail || error.message,
+        };
+    }
+};
+
+// -------------------- CHAT WITH JUDGMENT --------------------
+export const chatWithJudgment = async (question, judgmentText) => {
+    try {
+        const response = await axios.post(`${API_BASE}/chat`, {
+            question,
+            judgment_text: judgmentText,
+        }, {
+            timeout: 120000, // 2 minutes
+        });
+        return { success: true, data: response.data };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.response?.data?.detail || error.message,
+        };
     }
 };
 
@@ -82,4 +107,5 @@ export default {
     analyzeDocument,
     fetchHistory,
     fetchAnalysisById,
+    chatWithJudgment,
 };

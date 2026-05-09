@@ -8,15 +8,20 @@ Agents:
 3. Precedent Analyzer - Analyzes citations and precedents
 4. Logic Auditor - Checks reasoning and consistency
 5. Summary Writer - Creates citizen-friendly summary
-
-FIXED: Now uses actual DuckDuckGo to get REAL, RELEVANT links
-       (not hardcoded fake URLs)
+6. Justice Scorer - Rates judgment fairness on 4 dimensions
+7. Timeline Extractor - Extracts chronological events from the case
 """
 
 import json
 import re
+import sys
 from typing import TypedDict, Annotated, List
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+# Fix Windows console encoding
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 # --- AGENT STATE ---
 
@@ -30,6 +35,8 @@ class AgentState(TypedDict):
     precedent_analysis: str
     logic_audit: str
     final_summary: str
+    justice_score: dict
+    timeline: dict
     messages: Annotated[List, list.__add__]
     current_agent: str
 
@@ -105,7 +112,7 @@ OUTPUT (ONLY the core issue, no explanations):"""
             # Clean up
             core = core.replace('"', '').replace("'", '').strip()
             return core
-        except:
+        except Exception:
             return "IPC case law"
     
     def _extract_primary_section(self, laws: str, text: str) -> str:
@@ -131,6 +138,8 @@ OUTPUT (ONLY the core issue, no explanations):"""
         # Fallback: regex extraction
         match = re.search(r'Section (\d+[A-Z]*)', laws or text)
         if match:
+        
+        
             return f"Section {match.group(1)} IPC"
         
         return "IPC"
@@ -331,27 +340,168 @@ SUMMARY:"""
         return state
 
 
+# --- JUSTICE SCORING AGENT ---
+
+class ScoringAgent:
+    """Agent 6: Rates judgment fairness on multiple dimensions"""
+    
+    def __init__(self, llm):
+        self.llm = llm
+        self.name = "Justice Scorer"
+    
+    def _default_score(self):
+        return {
+            "overall_score": 70,
+            "label": "FAIR",
+            "consistency_with_law": 70,
+            "precedent_alignment": 70,
+            "reasoning_quality": 70,
+            "evidence_consideration": 70,
+            "flags": ["Unable to generate detailed scoring"]
+        }
+    
+    def run(self, state: AgentState) -> AgentState:
+        print(f"\n⚖️ {self.name} Agent is working...")
+        
+        prompt = f"""You are a Judicial Fairness Scoring Specialist.
+
+Rate this judgment on these 4 criteria (each score 0-100):
+1. consistency_with_law: How well does the judgment follow applicable laws?
+2. precedent_alignment: Does it align with established precedents?
+3. reasoning_quality: Is the legal reasoning sound and logical?
+4. evidence_consideration: Were all pieces of evidence properly considered?
+
+JUDGMENT:
+{state['judgment_text'][:3000]}
+
+LAWS APPLIED:
+{state['laws_found'][:500]}
+
+LOGIC AUDIT:
+{state['logic_audit'][:500]}
+
+Also determine:
+- overall_score: weighted average of the 4 scores
+- label: one of EXCELLENT (90+), GOOD (75-89), FAIR (60-74), CONCERNING (40-59), POOR (0-39)
+- flags: list of 1-3 brief concerns or notable observations
+
+RESPOND WITH ONLY THIS JSON (no other text, no markdown):
+{{"overall_score": 78, "label": "GOOD", "consistency_with_law": 82, "precedent_alignment": 71, "reasoning_quality": 80, "evidence_consideration": 78, "flags": ["Sentencing is harsher than precedent average"]}}"""
+
+        try:
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            raw = response.content.strip()
+            
+            json_match = re.search(r'\{[\s\S]*\}', raw)
+            if json_match:
+                score_data = json.loads(json_match.group())
+                # Validate required keys exist
+                required = ['overall_score', 'label', 'consistency_with_law',
+                           'precedent_alignment', 'reasoning_quality', 'evidence_consideration']
+                if all(k in score_data for k in required):
+                    state['justice_score'] = score_data
+                else:
+                    state['justice_score'] = self._default_score()
+            else:
+                state['justice_score'] = self._default_score()
+        except Exception as e:
+            print(f"   ⚠️ Scoring error: {e}")
+            state['justice_score'] = self._default_score()
+        
+        state['messages'].append(AIMessage(content=f"[{self.name}] Score: {state['justice_score'].get('overall_score', 'N/A')}/100"))
+        state['current_agent'] = self.name
+        
+        print(f"   ✅ Justice Score: {state['justice_score'].get('overall_score', 'N/A')}/100 ({state['justice_score'].get('label', 'N/A')})")
+        return state
+
+
+# --- TIMELINE EXTRACTOR AGENT ---
+
+class TimelineAgent:
+    """Agent 7: Extracts chronological events from the judgment"""
+    
+    def __init__(self, llm):
+        self.llm = llm
+        self.name = "Timeline Extractor"
+    
+    def _default_timeline(self):
+        return {
+            "events": [{"date": "N/A", "event": "Timeline extraction unavailable", "type": "info"}],
+            "total_duration": "Unknown",
+            "verdict": "See summary",
+            "sentence": "See summary"
+        }
+    
+    def run(self, state: AgentState) -> AgentState:
+        print(f"\n📅 {self.name} Agent is working...")
+        
+        prompt = f"""You are a Legal Case Timeline Specialist.
+
+Extract the key chronological events from this judgment.
+
+JUDGMENT:
+{state['judgment_text'][:4000]}
+
+Extract 5-8 key events with dates (or approximate periods). Include:
+- When the incident/crime occurred
+- When FIR/complaint was filed
+- Key investigation milestones
+- Trial events
+- Final verdict and sentence
+
+For each event, assign a type: "incident", "filing", "investigation", "arrest", "trial", "verdict", "appeal", or "other"
+
+RESPOND WITH ONLY THIS JSON (no other text, no markdown):
+{{"events": [{{"date": "Jan 2019", "event": "FIR filed at XYZ police station", "type": "filing"}}, {{"date": "Mar 2019", "event": "Accused arrested", "type": "arrest"}}], "total_duration": "4 years, 7 months", "verdict": "GUILTY", "sentence": "Life imprisonment"}}"""
+
+        try:
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            raw = response.content.strip()
+            
+            json_match = re.search(r'\{[\s\S]*\}', raw)
+            if json_match:
+                timeline_data = json.loads(json_match.group())
+                if 'events' in timeline_data and len(timeline_data['events']) > 0:
+                    state['timeline'] = timeline_data
+                else:
+                    state['timeline'] = self._default_timeline()
+            else:
+                state['timeline'] = self._default_timeline()
+        except Exception as e:
+            print(f"   ⚠️ Timeline error: {e}")
+            state['timeline'] = self._default_timeline()
+        
+        event_count = len(state['timeline'].get('events', []))
+        state['messages'].append(AIMessage(content=f"[{self.name}] Extracted {event_count} events"))
+        state['current_agent'] = self.name
+        
+        print(f"   ✅ Extracted {event_count} timeline events")
+        return state
+
+
 # --- MULTI-AGENT ORCHESTRATOR ---
 
 class MultiAgentOrchestrator:
-    """Manages the multi-agent workflow with REAL DuckDuckGo web search"""
+    """Manages the 7-agent workflow with web search, scoring, and timeline"""
     
     def __init__(self, llm, web_search_function=None):
         self.llm = llm
         self.web_search_function = web_search_function
         
-        # Initialize all agents
+        # Initialize all 7 agents
         self.law_agent = LawIdentifierAgent(llm)
         self.web_agent = WebResearchAgent(llm, web_search_function)
         self.precedent_agent = PrecedentAnalyzerAgent(llm)
         self.logic_agent = LogicAuditorAgent(llm)
         self.summary_agent = SummaryWriterAgent(llm)
+        self.scoring_agent = ScoringAgent(llm)
+        self.timeline_agent = TimelineAgent(llm)
     
     def run(self, judgment_text: str, rag_context: str = "") -> dict:
-        """Execute the multi-agent workflow"""
+        """Execute the 7-agent workflow"""
         
         print("\n" + "="*70)
-        print("🤖 MULTI-AGENT SYSTEM ACTIVATED (WITH REAL WEB SEARCH)")
+        print("🤖 MULTI-AGENT SYSTEM ACTIVATED (7 AGENTS)")
         print("="*70)
         
         # Initialize state
@@ -364,19 +514,23 @@ class MultiAgentOrchestrator:
             precedent_analysis="",
             logic_audit="",
             final_summary="",
+            justice_score={},
+            timeline={},
             messages=[],
             current_agent="initializing"
         )
         
         # Execute agents in sequence
-        state = self.law_agent.run(state)
-        state = self.web_agent.run(state)
-        state = self.precedent_agent.run(state)
-        state = self.logic_agent.run(state)
-        state = self.summary_agent.run(state)
+        state = self.law_agent.run(state)         # 1. Extract laws
+        state = self.web_agent.run(state)          # 2. Web research
+        state = self.precedent_agent.run(state)    # 3. Precedent analysis
+        state = self.logic_agent.run(state)        # 4. Logic audit
+        state = self.summary_agent.run(state)      # 5. Summary
+        state = self.scoring_agent.run(state)      # 6. Justice score
+        state = self.timeline_agent.run(state)     # 7. Timeline
         
         print("\n" + "="*70)
-        print("✅ ALL AGENTS COMPLETED")
+        print("✅ ALL 7 AGENTS COMPLETED")
         print("="*70 + "\n")
         
         # Return formatted results
@@ -391,7 +545,9 @@ LOGIC AUDIT:
 {state['logic_audit']}
 """,
             "web_research": state['web_research'],
-            "web_sources": state['web_sources'],  # REAL URLs from DuckDuckGo
+            "web_sources": state['web_sources'],
+            "justice_score": state['justice_score'],
+            "timeline": state['timeline'],
             "context_used": state['rag_context'][:500],
             "agent_messages": [msg.content for msg in state['messages']]
         }
@@ -402,8 +558,10 @@ LOGIC AUDIT:
 if __name__ == "__main__":
     print("Multi-Agent Legal Analysis System Ready")
     print("Features:")
-    print("  ✓ Law Identifier Agent")
-    print("  ✓ Web Research Agent (REAL DuckDuckGo Search)")
-    print("  ✓ Precedent Analyzer Agent")
-    print("  ✓ Logic Auditor Agent")
-    print("  ✓ Summary Writer Agent")
+    print("  1. Law Identifier Agent")
+    print("  2. Web Research Agent (DuckDuckGo)")
+    print("  3. Precedent Analyzer Agent")
+    print("  4. Logic Auditor Agent")
+    print("  5. Summary Writer Agent")
+    print("  6. Justice Scoring Agent")
+    print("  7. Timeline Extractor Agent")

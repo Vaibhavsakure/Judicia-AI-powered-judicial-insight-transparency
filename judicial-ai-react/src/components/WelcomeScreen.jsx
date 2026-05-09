@@ -1,87 +1,117 @@
+import { motion } from "framer-motion";
+
 export default function WelcomeScreen() {
     const features = [
         {
-            icon: (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-            ),
+            icon: "⚖️",
             title: "Legal Retrieval",
-            description: "Extract relevant statutes and precedents"
+            description: "Extract relevant statutes, sections, and legal provisions from the judgment text",
         },
         {
-            icon: (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-            ),
+            icon: "🤖",
             title: "Multi-Agent AI",
-            description: "Collaborative analysis from multiple perspectives"
+            description: "Collaborative analysis from multiple AI perspectives for comprehensive insight",
         },
         {
-            icon: (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-            ),
-            title: "Web-Grounded Sources",
-            description: "Verified references from trusted databases"
+            icon: "🌐",
+            title: "Web-Grounded",
+            description: "Verified references and recent precedents from trusted legal databases",
         },
         {
-            icon: (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-            ),
+            icon: "💬",
             title: "Plain Language",
-            description: "Complex legal concepts made accessible"
-        }
+            description: "Complex legal reasoning translated into clear, accessible language",
+        },
     ];
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1,
+                delayChildren: 0.2,
+            },
+        },
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+    };
+
     return (
-        <div className="max-w-5xl mx-auto text-center mt-20">
-            <div className="mb-12 animate-fade-in">
-                <div className="inline-block p-3 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-3xl shadow-2xl mb-6">
-                    <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                    </svg>
-                </div>
-
-                <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 bg-clip-text text-transparent mb-4">
-                    Welcome to Judicia
-                </h1>
-                <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                    Understand judicial reasoning with transparent, AI-assisted analysis.
-                    Upload a judgment to begin exploring the legal framework behind decisions.
-                </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-16">
-                {features.map((feature, i) => (
-                    <div
-                        key={i}
-                        className="group bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-lg hover:shadow-2xl border border-white/50 hover:border-indigo-200 transition-all duration-300 hover:-translate-y-1 animate-fade-in"
-                        style={{ animationDelay: `${i * 100}ms` }}
-                    >
-                        <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center text-white mb-4 mx-auto shadow-lg group-hover:scale-110 transition-transform">
-                            {feature.icon}
+        <div className="flex items-center justify-center min-h-full px-6 py-12">
+            <motion.div
+                className="max-w-3xl mx-auto text-center"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+            >
+                {/* Hero */}
+                <motion.div variants={itemVariants} className="mb-12">
+                    {/* Floating icon */}
+                    <div className="relative inline-block mb-8">
+                        <div className="w-20 h-20 bg-gradient-to-br from-accent to-purple-800 rounded-2xl flex items-center justify-center shadow-glow-purple-lg rotate-3 animate-float">
+                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                            </svg>
                         </div>
-                        <h3 className="text-base font-bold text-slate-900 mb-2">
-                            {feature.title}
-                        </h3>
-                        <p className="text-sm text-slate-600 leading-relaxed">
-                            {feature.description}
-                        </p>
+                        {/* Glow behind */}
+                        <div className="absolute inset-0 bg-accent/30 rounded-2xl blur-2xl" />
                     </div>
-                ))}
-            </div>
 
-            <div className="mt-16 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-indigo-100">
-                <p className="text-sm text-slate-700 font-medium">
-                    <span className="inline-block mr-2">👈</span>
-                    Get started by uploading a PDF judgment using the sidebar
-                </p>
-            </div>
+                    <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">
+                        Welcome to{" "}
+                        <span className="text-gradient-purple">Judicia</span>
+                    </h1>
+                    <p className="text-base md:text-lg text-lavender/60 max-w-xl mx-auto leading-relaxed">
+                        Understand judicial reasoning with transparent, AI-assisted analysis.
+                        Upload a judgment to explore the legal framework behind decisions.
+                    </p>
+                </motion.div>
+
+                {/* Feature grid */}
+                <motion.div
+                    variants={containerVariants}
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10"
+                >
+                    {features.map((feature, i) => (
+                        <motion.div
+                            key={i}
+                            variants={itemVariants}
+                            className="group glass-panel-hover rounded-xl p-5 text-left"
+                        >
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-accent/20 transition-colors text-lg">
+                                    {feature.icon}
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-white mb-1 group-hover:text-accent-light transition-colors">
+                                        {feature.title}
+                                    </h3>
+                                    <p className="text-xs text-lavender/40 leading-relaxed">
+                                        {feature.description}
+                                    </p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ))}
+                </motion.div>
+
+                {/* Call to action hint */}
+                <motion.div
+                    variants={itemVariants}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface/50 border border-border/30"
+                >
+                    <svg className="w-4 h-4 text-accent-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                    </svg>
+                    <span className="text-xs text-lavender/40 font-medium">
+                        Upload a PDF judgment from the sidebar to begin
+                    </span>
+                </motion.div>
+            </motion.div>
         </div>
     );
 }

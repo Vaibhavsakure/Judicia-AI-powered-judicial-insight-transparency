@@ -12,12 +12,16 @@ import os
 import io
 import sys
 import re
+import json
 import PyPDF2
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List, Optional
+from sqlalchemy.orm import Session
 
 from langchain_ollama import ChatOllama
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -29,27 +33,18 @@ from langchain_core.messages import HumanMessage
 # --------------------------------------------------
 # BASIC SETUP
 # --------------------------------------------------
+# Fix Windows console encoding (cp1252 can't handle Unicode emojis)
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 load_dotenv()
 
-from agents import MultiAgentOrchestrator   # IMPORTANT: your existing agents.py
-
-# --------------------------------------------------
-# FASTAPI
-# --------------------------------------------------
-app = FastAPI(
-    title="Judicial AI Backend",
-    version="2.2.0",
-    description="AI-powered legal judgment analysis platform"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # REQUIRED for judges & ngrok
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from agents import MultiAgentOrchestrator
+from database import engine, SessionLocal, get_db
+from models import Judgment, Analysis
 
 # --------------------------------------------------
 # OLLAMA (LOCAL LLM)
@@ -112,6 +107,41 @@ if os.path.exists(VECTOR_PATH):
 class WebQuery(BaseModel):
     query: str
 
+class ChatRequest(BaseModel):
+    question: str
+    judgment_text: str
+
+class AnalyzeResponse(BaseModel):
+    filename: str
+    summary: Optional[str] = None
+    laws: Optional[str] = None
+    analysis: Optional[str] = None
+    web_sources: List[dict] = []
+    justice_score: Optional[dict] = None
+    timeline: Optional[dict] = None
+    extracted_text: Optional[str] = None
+
+class HistoryItem(BaseModel):
+    id: int
+    filename: str
+    upload_date: str
+    summary_snippet: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+class HistoryDetail(BaseModel):
+    id: int
+    filename: str
+    upload_date: str
+    summary: Optional[str] = None
+    laws: Optional[str] = None
+    analysis: Optional[str] = None
+    web_sources: list = []
+    justice_score: Optional[dict] = None
+    timeline: Optional[dict] = None
+
+    model_config = {"from_attributes": True}
+
 # --------------------------------------------------
 # HELPERS
 # --------------------------------------------------
@@ -130,7 +160,7 @@ def extract_urls(raw: str) -> list:
     urls = re.findall(r'https?://[^\s,\]\'"]+', raw)
     cleaned = []
     for u in urls:
-        u = re.sub(r'[,\]\)\}\'"]$', '', u)
+        u = re.sub(r'[,\]\)\}\'\"]$', '', u)
         if u.startswith("http") and len(u) > 20:
             cleaned.append(u)
     return cleaned[:5]
@@ -216,9 +246,10 @@ def run_analysis(text: str):
 
     if not multi_agent:
         return {
-            "summary": "LLM not active",
+            "summary": "LLM not active — please ensure Ollama is running with llama3.1 loaded.",
             "analysis": "",
-            "laws": ""
+            "laws": "",
+            "web_sources": []
         }
 
     return multi_agent.run(
@@ -227,10 +258,43 @@ def run_analysis(text: str):
     )
 
 # --------------------------------------------------
+# LIFESPAN (replaces deprecated @app.on_event)
+# --------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: create DB tables
+    from database import Base
+    Base.metadata.create_all(bind=engine)
+    print("\n🚀 JUDICIAL AI BACKEND READY (FULLY WORKING)")
+    print("   Open /docs for API testing")
+    print("   Share ngrok link with judges\n")
+    yield
+    # Shutdown
+    print("👋 Backend shutting down")
+
+# --------------------------------------------------
+# FASTAPI
+# --------------------------------------------------
+app = FastAPI(
+    title="Judicial AI Backend",
+    version="2.3.0",
+    description="AI-powered legal judgment analysis platform",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    # TODO: Restrict to specific origins in production
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --------------------------------------------------
 # API ENDPOINTS
 # --------------------------------------------------
-@app.post("/analyze")
-async def analyze_pdf(file: UploadFile = File(...)):
+@app.post("/analyze", response_model=AnalyzeResponse)
+async def analyze_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files allowed")
 
@@ -238,17 +302,113 @@ async def analyze_pdf(file: UploadFile = File(...)):
     text = extract_text_from_pdf(data)
     result = run_analysis(text)
 
+    # Persist to database
+    try:
+        judgment = Judgment(filename=file.filename)
+        db.add(judgment)
+        db.flush()
+
+        analysis = Analysis(
+            judgment_id=judgment.id,
+            summary=result.get("summary", ""),
+            laws=result.get("laws", ""),
+            analysis_content=result.get("analysis", ""),
+            web_research=result.get("web_research", ""),
+            web_sources=json.dumps(result.get("web_sources", []))
+        )
+        db.add(analysis)
+        db.commit()
+        print(f"💾 Saved analysis for: {file.filename}")
+    except Exception as e:
+        db.rollback()
+        print(f"⚠️ DB save failed (analysis still returned): {e}")
+
     return {
         "filename": file.filename,
         "summary": result.get("summary"),
         "laws": result.get("laws"),
         "analysis": result.get("analysis"),
-        "web_sources": result.get("web_sources", [])
+        "web_sources": result.get("web_sources", []),
+        "justice_score": result.get("justice_score"),
+        "timeline": result.get("timeline"),
+        "extracted_text": text,
     }
 
 @app.post("/web-search")
 def manual_web_search(query: WebQuery):
     return web_search(query.query)
+
+@app.post("/chat")
+def chat_with_judgment(req: ChatRequest):
+    """Chat with a judgment document using AI."""
+    if not llm:
+        raise HTTPException(status_code=503, detail="LLM not available. Ensure Ollama is running.")
+
+    prompt = f"""You are a legal assistant. Answer the user's question based ONLY on the judgment text provided.
+Be concise, accurate, and use simple language that a non-lawyer can understand.
+If the answer is not found in the judgment, say so clearly.
+
+JUDGMENT TEXT:
+{req.judgment_text[:6000]}
+
+USER QUESTION:
+{req.question}
+
+ANSWER:"""
+
+    try:
+        response = llm.invoke([HumanMessage(content=prompt)])
+        return {"answer": response.content.strip()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+@app.get("/history", response_model=List[HistoryItem])
+def get_history(db: Session = Depends(get_db)):
+    """List all past judgment analyses, newest first."""
+    judgments = db.query(Judgment).order_by(Judgment.upload_date.desc()).all()
+
+    items = []
+    for j in judgments:
+        snippet = None
+        if j.analyses:
+            latest = j.analyses[-1]
+            if latest.summary:
+                snippet = latest.summary[:120] + "..." if len(latest.summary) > 120 else latest.summary
+
+        items.append({
+            "id": j.id,
+            "filename": j.filename,
+            "upload_date": j.upload_date.isoformat() if j.upload_date else "",
+            "summary_snippet": snippet,
+        })
+
+    return items
+
+@app.get("/history/{judgment_id}", response_model=HistoryDetail)
+def get_history_detail(judgment_id: int, db: Session = Depends(get_db)):
+    """Get full analysis for a specific judgment."""
+    judgment = db.query(Judgment).filter(Judgment.id == judgment_id).first()
+    if not judgment:
+        raise HTTPException(status_code=404, detail="Judgment not found")
+
+    latest_analysis = judgment.analyses[-1] if judgment.analyses else None
+
+    web_sources = []
+    if latest_analysis and latest_analysis.web_sources:
+        try:
+            web_sources = json.loads(latest_analysis.web_sources)
+        except (json.JSONDecodeError, TypeError):
+            web_sources = []
+
+    return {
+        "id": judgment.id,
+        "filename": judgment.filename,
+        "upload_date": judgment.upload_date.isoformat() if judgment.upload_date else "",
+        "summary": latest_analysis.summary if latest_analysis else None,
+        "laws": latest_analysis.laws if latest_analysis else None,
+        "analysis": latest_analysis.analysis_content if latest_analysis else None,
+        "web_sources": web_sources,
+    }
 
 @app.get("/health")
 def health():
@@ -259,15 +419,6 @@ def health():
         "multi_agent": bool(multi_agent),
         "web_search": bool(gemini_llm)
     }
-
-# --------------------------------------------------
-# STARTUP
-# --------------------------------------------------
-@app.on_event("startup")
-async def startup():
-    print("\n🚀 JUDICIAL AI BACKEND READY (FULLY WORKING)")
-    print("   Open /docs for API testing")
-    print("   Share ngrok link with judges\n")
 
 # --------------------------------------------------
 # RUN

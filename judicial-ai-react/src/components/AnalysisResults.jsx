@@ -1,186 +1,187 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import JusticeScore from "./JusticeScore";
+import CaseTimeline from "./CaseTimeline";
+import JudgmentChat from "./JudgmentChat";
+
+const tabs = [
+    { name: "Summary", icon: "📄" },
+    { name: "Laws", icon: "📚" },
+    { name: "Analysis", icon: "🔬" },
+    { name: "Justice Score", icon: "⚖️" },
+    { name: "Timeline", icon: "📅" },
+    { name: "Chat", icon: "💬" },
+    { name: "Sources", icon: "🔗" },
+];
 
 export default function AnalysisResults({ data }) {
-    const tabs = [
-        {
-            name: "Summary of Overall Case",
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            )
-        },
-        {
-            name: "Law Used",
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-            )
-        },
-        {
-            name: "Reason",
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            )
-        },
-        {
-            name: "Sources",
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-            )
-        }
-    ];
-
     const [active, setActive] = useState(0);
 
-    // Function to clean and format text content
     const formatTextContent = (text) => {
-        if (!text) return null;
-
-        // Remove all ** (asterisks used for markdown bold)
+        if (!text) return <EmptyState message="No content available" />;
         let cleaned = text.replace(/\*\*/g, '');
-
-        // Split into paragraphs
         const paragraphs = cleaned.split('\n\n').filter(p => p.trim());
+        return (
+            <div className="prose-dark space-y-1">
+                {paragraphs.map((para, idx) => {
+                    const isHeading = para.endsWith(':') || para.endsWith('?') ||
+                        (para.length < 100 && !para.includes('.'));
+                    const isListItem = /^[\*\-\•]\s/.test(para.trim()) || /^\d+[\.)]\s/.test(para.trim());
 
-        return paragraphs.map((para, idx) => {
-            // Check if it's a heading (ends with :, ?, or is very short)
-            const isHeading = para.endsWith(':') || para.endsWith('?') ||
-                (para.length < 100 && !para.includes('.'));
-
-            // Check if it's a list item (starts with *, -, or number)
-            const isListItem = /^[\*\-\•]\s/.test(para.trim()) || /^\d+[\.\)]\s/.test(para.trim());
-
-            if (isHeading && para.length < 100) {
-                return (
-                    <h3 key={idx} className="text-lg font-bold text-slate-900 mt-6 mb-3 first:mt-0">
-                        {para.replace(/[\:\?]$/, '')}
-                    </h3>
-                );
-            } else if (isListItem) {
-                return (
-                    <p key={idx} className="text-base text-slate-700 leading-relaxed mb-3 pl-4">
-                        {para.replace(/^[\*\-\•]\s/, '• ')}
-                    </p>
-                );
-            } else {
-                return (
-                    <p key={idx} className="text-base text-slate-700 leading-relaxed mb-4">
-                        {para}
-                    </p>
-                );
-            }
-        });
+                    if (isHeading && para.length < 100) {
+                        return (
+                            <h3 key={idx} className="text-base font-bold text-white mt-6 mb-2 first:mt-0 flex items-center gap-2">
+                                <div className="w-1 h-5 bg-accent rounded-full" />
+                                {para.replace(/[\:\?]$/, '')}
+                            </h3>
+                        );
+                    } else if (isListItem) {
+                        return (
+                            <p key={idx} className="text-sm text-lavender/70 leading-relaxed pl-4 border-l-2 border-border/30 ml-2">
+                                {para.replace(/^[\*\-\•]\s/, '• ')}
+                            </p>
+                        );
+                    } else {
+                        return (
+                            <p key={idx} className="text-sm text-lavender/70 leading-relaxed">
+                                {para}
+                            </p>
+                        );
+                    }
+                })}
+            </div>
+        );
     };
 
-    const sections = [
-        // Summary of Overall Case
-        <div className="space-y-2">
-            {formatTextContent(data.summary)}
-        </div>,
-
-        // Law Used
-        <div className="space-y-2">
-            {formatTextContent(data.laws)}
-        </div>,
-
-        // Reason (Consistency/Analysis)
-        <div className="space-y-2">
-            {formatTextContent(data.analysis)}
-        </div>,
-
-        // Sources
-        data.web_sources?.length > 0 ? (
-            <div className="space-y-3">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">
-                    Referenced Sources
-                </h3>
-                {data.web_sources.map((s, i) => (
-                    <a
-                        key={i}
-                        href={s.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-start gap-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-xl border border-indigo-200 hover:border-indigo-300 transition-all duration-200 group"
-                    >
-                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-base font-bold text-indigo-700 group-hover:text-indigo-900 mb-2 line-clamp-2">
-                                {s.title}
-                            </p>
-                            <p className="text-sm text-slate-600 truncate mb-2">
-                                {s.url}
-                            </p>
-                            {s.snippet && (
-                                <p className="text-sm text-slate-600 leading-relaxed">
-                                    {s.snippet}
-                                </p>
-                            )}
-                        </div>
-                        <svg className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    </a>
-                ))}
-            </div>
-        ) : (
-            <div className="text-center py-12">
-                <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                </div>
-                <p className="text-slate-500 font-semibold">No sources available</p>
-                <p className="text-sm text-slate-400 mt-2">Web research did not return any sources for this analysis</p>
-            </div>
-        )
-    ];
+    const renderContent = () => {
+        switch (active) {
+            case 0:
+                return formatTextContent(data.summary);
+            case 1:
+                return formatTextContent(data.laws);
+            case 2:
+                return formatTextContent(data.analysis);
+            case 3:
+                return <JusticeScore scoreData={data.justice_score} />;
+            case 4:
+                return <CaseTimeline timelineData={data.timeline} />;
+            case 5:
+                return <JudgmentChat extractedText={data.extracted_text} />;
+            case 6:
+                return <SourcesPanel sources={data.web_sources} />;
+            default:
+                return null;
+        }
+    };
 
     return (
-        <div>
-            {/* Tabs Navigation */}
-            <div className="flex flex-wrap gap-2 px-6 pt-6 pb-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
-                {tabs.map((tab, i) => (
-                    <button
-                        key={i}
-                        onClick={() => setActive(i)}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${active === i
-                                ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg scale-105"
-                                : "text-slate-600 hover:text-indigo-600 hover:bg-white/70 hover:shadow-sm"
+        <div className="flex flex-col h-full">
+            {/* Tab bar */}
+            <div className="flex-shrink-0 px-6 pt-4 pb-3 border-b border-border/20 bg-abyss-50/50 backdrop-blur-md">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    {tabs.map((tab, i) => (
+                        <button
+                            key={i}
+                            id={`tab-${tab.name.toLowerCase().replace(/\s+/g, '-')}`}
+                            onClick={() => setActive(i)}
+                            className={`tab-pill flex items-center gap-2 ${
+                                active === i ? 'tab-pill-active' : 'tab-pill-inactive'
                             }`}
-                    >
-                        <span className={active === i ? "text-white" : ""}>
-                            {tab.icon}
-                        </span>
-                        {tab.name}
-                    </button>
-                ))}
-            </div>
-
-            {/* Content Area */}
-            <div className="p-8">
-                <div className="max-w-none">
-                    {sections[active] || (
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                </svg>
-                            </div>
-                            <p className="text-slate-500 font-semibold">No data available for this section</p>
-                        </div>
-                    )}
+                        >
+                            <span className="text-sm">{tab.icon}</span>
+                            <span>{tab.name}</span>
+                        </button>
+                    ))}
                 </div>
             </div>
+
+            {/* Content area */}
+            <div className="flex-1 overflow-y-auto">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={active}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        className="p-6 max-w-5xl"
+                    >
+                        {renderContent()}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+        </div>
+    );
+}
+
+/* ========== Empty State ========== */
+function EmptyState({ message, sub }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 bg-surface-light rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-lavender/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+            </div>
+            <p className="text-sm font-semibold text-lavender/40">{message}</p>
+            {sub && <p className="text-xs text-lavender/20 mt-1">{sub}</p>}
+        </div>
+    );
+}
+
+/* ========== Sources Panel ========== */
+function SourcesPanel({ sources }) {
+    if (!sources || sources.length === 0) {
+        return (
+            <EmptyState
+                message="No sources available"
+                sub="Web research did not return sources for this analysis"
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                <div className="w-1 h-5 bg-accent rounded-full" />
+                Referenced Sources
+            </h3>
+            {sources.map((s, i) => (
+                <motion.a
+                    key={i}
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="group flex items-start gap-4 p-4 glass-panel-hover rounded-xl"
+                >
+                    {/* Number badge */}
+                    <div className="flex-shrink-0 w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
+                        <span className="text-xs font-bold text-accent-light">{i + 1}</span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white group-hover:text-accent-light transition-colors mb-1 line-clamp-2">
+                            {s.title}
+                        </p>
+                        <p className="text-xs text-lavender/30 truncate mb-1.5">{s.url}</p>
+                        {s.snippet && (
+                            <p className="text-xs text-lavender/50 leading-relaxed line-clamp-2">
+                                {s.snippet}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* External link icon */}
+                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg className="w-4 h-4 text-accent-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </div>
+                </motion.a>
+            ))}
         </div>
     );
 }

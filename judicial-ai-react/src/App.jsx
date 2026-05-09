@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import HistorySidebar from "./components/HistorySidebar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import AnalysisResults from "./components/AnalysisResults";
 import ProgressSteps from "./components/ProgressSteps";
-import { analyzeDocument } from "./services/api";
+import Toast from "./components/Toast";
+import { analyzeDocument, fetchAnalysisById } from "./services/api";
 
 export default function App() {
     const [file, setFile] = useState(null);
@@ -14,8 +16,10 @@ export default function App() {
     const [progress, setProgress] = useState(0);
     const [step, setStep] = useState(0);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [error, setError] = useState(null);
+    const [toast, setToast] = useState(null);
 
-    const steps = [15, 30, 50, 70, 85, 95];
+    const steps = [12, 25, 40, 55, 70, 82, 95];
 
     useEffect(() => {
         if (loading && step < steps.length) {
@@ -27,118 +31,261 @@ export default function App() {
         }
     }, [loading, step]);
 
+    const showToast = useCallback((message, type = "success") => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+    }, []);
+
     const runAnalysis = async () => {
         setLoading(true);
         setData(null);
+        setError(null);
         setProgress(0);
         setStep(0);
+
         const res = await analyzeDocument(file);
-        setData(res.data);
-        setProgress(100);
+
+        if (res.success) {
+            setData(res.data);
+            setProgress(100);
+            showToast("Analysis completed successfully", "success");
+        } else {
+            setError(res.error || "Analysis failed. Please try again.");
+            setProgress(0);
+            showToast(res.error || "Analysis failed", "error");
+        }
         setLoading(false);
     };
 
-    return (
-        <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative overflow-hidden">
-            {/* Decorative background elements */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-200/30 to-indigo-300/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-teal-200/30 to-cyan-300/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+    const handleSelectHistory = async (id) => {
+        setHistoryOpen(false);
+        setLoading(true);
+        setData(null);
+        setError(null);
+        setProgress(0);
+        setStep(0);
 
+        const res = await fetchAnalysisById(id);
+        if (res.success) {
+            setData(res.data);
+            setProgress(100);
+            showToast("Analysis loaded from history", "success");
+        } else {
+            setError(res.error || "Failed to load analysis.");
+            showToast(res.error || "Failed to load", "error");
+        }
+        setLoading(false);
+    };
+
+    const handleFileUpload = (f) => {
+        setFile(f);
+        setData(null);
+        setError(null);
+        if (f) showToast(`${f.name} uploaded`, "success");
+    };
+
+    return (
+        <div className="flex h-screen bg-abyss relative overflow-hidden">
+            {/* Ambient background effects */}
+            <div className="fixed inset-0 pointer-events-none z-0">
+                <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-accent/5 rounded-full blur-[120px] animate-float" />
+                <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px] animate-float" style={{ animationDelay: '3s' }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-accent/3 to-transparent rounded-full" />
+            </div>
+
+            {/* Toast notifications */}
+            <AnimatePresence>
+                {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            </AnimatePresence>
+
+            {/* History drawer */}
             <HistorySidebar
                 isOpen={historyOpen}
                 onClose={() => setHistoryOpen(false)}
+                onSelectHistory={handleSelectHistory}
             />
 
+            {/* Left sidebar */}
             <Sidebar
                 uploadedFile={file}
-                onFileUpload={setFile}
+                onFileUpload={handleFileUpload}
                 onOpenHistory={() => setHistoryOpen(true)}
+                loading={loading}
+                step={step}
+                progress={progress}
             />
 
-            <div className="flex-1 flex flex-col relative z-10">
+            {/* Main area */}
+            <div className="flex-1 flex flex-col relative z-10 min-w-0">
                 <Header />
 
-                <main className="flex-1 overflow-y-auto p-8">
-                    {!file && <WelcomeScreen />}
+                <main className="flex-1 overflow-y-auto">
+                    <AnimatePresence mode="wait">
+                        {/* Welcome state */}
+                        {!file && !data && (
+                            <motion.div
+                                key="welcome"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <WelcomeScreen />
+                            </motion.div>
+                        )}
 
-                    {file && !data && !loading && (
-                        <div className="max-w-3xl mx-auto">
-                            <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-white/50 hover:shadow-indigo-200/50 transition-all duration-300">
-                                <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
+                        {/* File uploaded, ready to analyze */}
+                        {file && !data && !loading && !error && (
+                            <motion.div
+                                key="ready"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.4 }}
+                                className="max-w-2xl mx-auto px-6 py-16"
+                            >
+                                <div className="glass-panel rounded-2xl p-8">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-accent to-purple-700 rounded-xl flex items-center justify-center shadow-glow-purple">
+                                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h2 className="text-xl font-bold text-white mb-1">
+                                                Document Ready
+                                            </h2>
+                                            <p className="text-sm text-lavender/80 font-medium truncate">
+                                                {file.name}
+                                            </p>
+                                            <p className="text-xs text-lavender/40 mt-1">
+                                                {(file.size / 1024).toFixed(1)} KB
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                                            Document Ready for Analysis
-                                        </h2>
-                                        <p className="text-sm text-slate-600 font-medium bg-slate-100 inline-block px-3 py-1 rounded-lg">
-                                            {file.name}
-                                        </p>
-                                    </div>
-                                </div>
 
-                                <button
-                                    onClick={runAnalysis}
-                                    className="mt-8 w-full px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white font-semibold shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 group"
-                                >
-                                    <svg className="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    Start AI Analysis
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {loading && (
-                        <div className="max-w-3xl mx-auto">
-                            <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-white/50">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="relative">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl animate-pulse"></div>
-                                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl blur-lg opacity-50 animate-pulse"></div>
-                                    </div>
-                                    <h3 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                                        AI Agents Processing
-                                    </h3>
-                                </div>
-
-                                <div className="relative h-4 bg-gradient-to-r from-slate-100 to-slate-200 rounded-full mb-6 overflow-hidden shadow-inner">
-                                    <div
-                                        className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 rounded-full transition-all duration-500 ease-out shadow-lg"
-                                        style={{ width: `${progress}%` }}
+                                    <button
+                                        onClick={runAnalysis}
+                                        className="mt-8 w-full group relative px-8 py-4 rounded-xl overflow-hidden font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 animate-shimmer"></div>
+                                        {/* Button gradient bg */}
+                                        <div className="absolute inset-0 bg-gradient-to-r from-accent via-purple-600 to-accent-dark" />
+                                        <div className="absolute inset-0 bg-gradient-to-r from-accent-light via-purple-500 to-accent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                        {/* Shimmer */}
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                                        <span className="relative flex items-center justify-center gap-3">
+                                            <svg className="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                            Start AI Analysis
+                                        </span>
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* Error state */}
+                        {error && (
+                            <motion.div
+                                key="error"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.4 }}
+                                className="max-w-2xl mx-auto px-6 py-16"
+                            >
+                                <div className="glass-panel rounded-2xl p-8 border-red-500/30">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-red-500 to-rose-700 rounded-xl flex items-center justify-center">
+                                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h2 className="text-xl font-bold text-red-400 mb-2">Analysis Failed</h2>
+                                            <p className="text-sm text-lavender/60 mb-6">{error}</p>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={runAnalysis}
+                                                    className="px-5 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-white font-semibold text-sm transition-all hover:shadow-glow-purple"
+                                                >
+                                                    Retry Analysis
+                                                </button>
+                                                <button
+                                                    onClick={() => { setError(null); setFile(null); }}
+                                                    className="px-5 py-2.5 rounded-xl bg-surface-light hover:bg-surface-hover text-lavender font-semibold text-sm border border-border transition-all"
+                                                >
+                                                    Upload Different File
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+                            </motion.div>
+                        )}
 
-                                <div className="text-center mb-6">
-                                    <span className="text-2xl font-bold text-indigo-600">{progress}%</span>
-                                    <span className="text-sm text-slate-500 ml-2">complete</span>
+                        {/* Loading state */}
+                        {loading && (
+                            <motion.div
+                                key="loading"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.4 }}
+                                className="max-w-2xl mx-auto px-6 py-16"
+                            >
+                                <div className="glass-panel rounded-2xl p-8">
+                                    <div className="flex items-center gap-3 mb-8">
+                                        <div className="relative">
+                                            <div className="w-10 h-10 bg-gradient-to-br from-accent to-purple-700 rounded-xl animate-pulse" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-accent to-purple-700 rounded-xl blur-lg opacity-50 animate-pulse-glow" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white">
+                                                AI Agents Processing
+                                            </h3>
+                                            <p className="text-xs text-lavender/50">
+                                                Multi-agent analysis in progress...
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress bar */}
+                                    <div className="relative h-2 bg-surface-light rounded-full mb-4 overflow-hidden">
+                                        <motion.div
+                                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-accent via-purple-500 to-accent-light rounded-full"
+                                            initial={{ width: '0%' }}
+                                            animate={{ width: `${progress}%` }}
+                                            transition={{ duration: 0.5, ease: "easeOut" }}
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                                        </motion.div>
+                                    </div>
+
+                                    <div className="flex justify-between items-center mb-8">
+                                        <span className="text-xs text-lavender/40">Processing document...</span>
+                                        <span className="text-sm font-bold text-accent-light">{progress}%</span>
+                                    </div>
+
+                                    <ProgressSteps currentStep={step} />
                                 </div>
+                            </motion.div>
+                        )}
 
-                                <ProgressSteps currentStep={step} />
-                            </div>
-                        </div>
-                    )}
-
-                    {data && (
-                        <div className="max-w-6xl mx-auto">
-                            <div className="mb-6 px-6 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white font-semibold shadow-xl flex items-center gap-3 animate-slide-in">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Analysis completed successfully
-                            </div>
-
-                            <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 overflow-hidden">
+                        {/* Results */}
+                        {data && (
+                            <motion.div
+                                key="results"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.4 }}
+                                className="h-full"
+                            >
                                 <AnalysisResults data={data} />
-                            </div>
-                        </div>
-                    )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </main>
             </div>
         </div>

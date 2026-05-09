@@ -2,167 +2,223 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#root {
-  height: 100%;
-}
+/* ============================================
+   JUDICIA — Dark Legal Intelligence
+   Design System: Global Styles
+   ============================================ */
 
-/* Custom animations */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
+  body {
+    background-color: #0D0F1A;
+    color: #C4B5FD;
   }
 
-  to {
-    opacity: 1;
-    transform: scale(1);
+  /* Selection */
+  ::selection {
+    background: rgba(124, 58, 237, 0.3);
+    color: #fff;
   }
 }
 
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-scale-in {
-  animation: scale-in 0.4s ease-out forwards;
-}
-
-.animate-slide-in {
-  animation: slide-in 0.5s ease-out forwards;
-}
-
-.animate-shimmer {
-  animation: shimmer 2s infinite;
-}
-
-/* Scrollbar styling */
+/* ============================================
+   Scrollbar — Slim, dark, accent-tinted
+   ============================================ */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(241, 245, 249, 0.5);
-  border-radius: 10px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #818cf8, #a78bfa);
+  background: rgba(124, 58, 237, 0.3);
   border-radius: 10px;
-  transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #6366f1, #8b5cf6);
+  background: rgba(124, 58, 237, 0.5);
 }
 
-/* Prose styling for analysis results */
-.prose {
-  max-width: none;
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
 }
 
-.prose p {
+/* ============================================
+   Custom Utility Classes
+   ============================================ */
+@layer utilities {
+  .text-gradient-purple {
+    @apply bg-gradient-to-r from-accent via-purple-400 to-lavender bg-clip-text text-transparent;
+  }
+
+  .text-gradient-white {
+    @apply bg-gradient-to-r from-white via-lavender-light to-white bg-clip-text text-transparent;
+  }
+
+  .glass-panel {
+    @apply bg-surface/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .glass-panel-hover {
+    @apply glass-panel hover:bg-surface-hover hover:border-border-light transition-all duration-300;
+  }
+
+  .glow-ring {
+    @apply ring-2 ring-accent/30 ring-offset-2 ring-offset-abyss;
+  }
+
+  .skeleton-dark {
+    @apply bg-surface-light animate-pulse rounded-lg;
+  }
+
+  /* Line clamp */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ============================================
+   Noise Texture Overlay
+   ============================================ */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* ============================================
+   Pill tab active indicator
+   ============================================ */
+.tab-pill {
+  @apply relative px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer whitespace-nowrap;
+}
+
+.tab-pill-active {
+  @apply bg-accent text-white shadow-glow-purple;
+}
+
+.tab-pill-inactive {
+  @apply text-lavender/60 hover:text-lavender hover:bg-surface-light;
+}
+
+/* ============================================
+   Chat bubble tails
+   ============================================ */
+.bubble-user {
+  @apply bg-gradient-to-br from-accent to-purple-700 text-white rounded-2xl rounded-br-md;
+}
+
+.bubble-ai {
+  @apply bg-surface border border-border/50 text-lavender rounded-2xl rounded-bl-md;
+}
+
+/* ============================================
+   Animated gradient border (used on upload)
+   ============================================ */
+@property --gradient-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.gradient-border {
+  --gradient-angle: 0deg;
+  border-image: conic-gradient(from var(--gradient-angle), #7C3AED, #C4B5FD, #7C3AED) 1;
+  animation: rotateGradient 4s linear infinite;
+}
+
+@keyframes rotateGradient {
+  to { --gradient-angle: 360deg; }
+}
+
+/* ============================================
+   Prose styling for dark theme
+   ============================================ */
+.prose-dark p {
   margin-bottom: 1em;
-  line-height: 1.7;
+  line-height: 1.8;
+  color: #C4B5FD;
 }
 
-.prose h1,
-.prose h2,
-.prose h3,
-.prose h4 {
+.prose-dark h1,
+.prose-dark h2,
+.prose-dark h3,
+.prose-dark h4 {
   font-weight: 700;
-  color: #1e293b;
+  color: #ffffff;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
 }
 
-.prose h1 {
-  font-size: 1.5em;
-}
+.prose-dark h1 { font-size: 1.5em; }
+.prose-dark h2 { font-size: 1.3em; }
+.prose-dark h3 { font-size: 1.1em; }
 
-.prose h2 {
-  font-size: 1.3em;
-}
-
-.prose h3 {
-  font-size: 1.1em;
-}
-
-.prose ul,
-.prose ol {
+.prose-dark ul,
+.prose-dark ol {
   margin-left: 1.5em;
   margin-bottom: 1em;
 }
 
-.prose li {
+.prose-dark li {
   margin-bottom: 0.5em;
   line-height: 1.7;
+  color: #C4B5FD;
 }
 
-.prose strong {
+.prose-dark strong {
   font-weight: 600;
-  color: #334155;
+  color: #DDD6FE;
 }
 
-.prose a {
-  color: #4f46e5;
+.prose-dark a {
+  color: #8B5CF6;
   text-decoration: underline;
-  transition: color 0.2s ease;
+  text-decoration-color: rgba(139, 92, 246, 0.3);
+  text-underline-offset: 2px;
+  transition: all 0.2s ease;
 }
 
-.prose a:hover {
-  color: #6366f1;
+.prose-dark a:hover {
+  color: #A78BFA;
+  text-decoration-color: rgba(167, 139, 250, 0.6);
 }
 
-.prose code {
-  background-color: #f1f5f9;
+.prose-dark code {
+  background-color: rgba(30, 32, 53, 0.8);
   padding: 0.2em 0.4em;
   border-radius: 0.25em;
   font-size: 0.9em;
-  font-family: 'Courier New', monospace;
-}
-
-/* Custom utilities */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: #DDD6FE;
+  border: 1px solid rgba(46, 49, 80, 0.5);
 }

@@ -1,5 +1,5 @@
 
-from pydantic import BaseModel, Json
+from pydantic import BaseModel
 from typing import List, Optional, Any
 from datetime import datetime
 
@@ -8,7 +8,7 @@ class AnalysisBase(BaseModel):
     laws: str
     analysis_content: str
     web_research: str
-    web_sources: Json  # Automatically parses JSON string from DB
+    web_sources: Any  # JSON parsed from DB
 
 class AnalysisCreate(AnalysisBase):
     pass
@@ -18,8 +18,7 @@ class Analysis(AnalysisBase):
     judgment_id: int
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 class JudgmentBase(BaseModel):
     filename: str
@@ -32,8 +31,7 @@ class Judgment(JudgmentBase):
     upload_date: datetime
     analyses: List[Analysis] = []
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 class JudgmentHistory(BaseModel):
     id: int
